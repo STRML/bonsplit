@@ -1656,6 +1656,7 @@ struct TabBarView: View {
                 splitActionButtonIcon(button.icon)
             }
             .buttonStyle(SplitActionButtonStyle(appearance: appearance, layout: tabBarLayout))
+            .accessibilityLabel(splitActionButtonTooltip(button, tooltips: tooltips))
         }
     }
 
