@@ -340,6 +340,7 @@ struct TabItemView: View {
         // Icon-only pinned tabs always size to their fixed compact width.
         .fixedSize(horizontal: isIconOnlyPinned || !fillsWidth, vertical: false)
         .background(tabBackground.saturation(saturation))
+        .background(TabPopoverAnchorView(tabId: tab.id, kind: .tabItem))
         .tabControlShortcutHintVisibilityAnimation(value: showsShortcutHint)
         .contentShape(Rectangle().inset(by: -BonsplitTabItemHitTesting.horizontalSlop))
         // Middle click to close (macOS convention).
@@ -401,6 +402,63 @@ struct TabItemView: View {
         }
         .tabGeometryDebugOnChange(of: tab.isLoading) { newValue in
             debugRecordIsLoadingStateChange(newValue)
+        }
+        .overlayPreferenceValue(TabPresenceAccessoryBoundsKey.self) { anchor in
+            presenceAccessoryOverlay(anchor)
+        }
+    }
+
+    private func presenceAccessory(_ presence: TabPresence) -> some View {
+        TabPresenceAccessoryView(
+            presence: presence,
+            borderColor: isSelected
+                ? TabBarColors.activeTabBackground(for: appearance)
+                : TabBarColors.barBackground(for: appearance),
+            textColor: isSelected
+                ? TabBarColors.activeText(for: appearance)
+                : TabBarColors.inactiveText(for: appearance),
+            isHovered: isPresenceHovered,
+            hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
+        )
+    }
+
+    /// The clickable presence accessory, placed over the space the title row
+    /// reserved for it. Toggles the host's size panel, which anchors to it.
+    @ViewBuilder
+    private func presenceAccessoryOverlay(_ anchor: Anchor<CGRect>?) -> some View {
+        if let anchor, let presence = tab.presence, presence.showsAccessory {
+            GeometryReader { proxy in
+                let rect = proxy[anchor]
+                Button {
+                    onContextAction(.toggleSizePanel)
+                } label: {
+                    presenceAccessory(presence)
+                }
+                .buttonStyle(.plain)
+                .background(TabPopoverAnchorView(tabId: tab.id, kind: .presenceAccessory))
+                .onHover { hovering in
+                    withTransaction(Transaction(animation: nil)) {
+                        isPresenceHovered = hovering
+                    }
+                }
+                .saturation(saturation)
+                .safeHelp(presence.accessibilityLabel)
+                .accessibilityElement(children: .ignore)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityLabel(presence.accessibilityLabel)
+                .accessibilityHint(
+                    Bundle.module.localizedString(
+                        forKey: "tabPresence.toggleSizePanel",
+                        value: "Shows or hides the terminal size panel",
+                        table: nil
+                    )
+                )
+                .accessibilityIdentifier("tabPresenceAccessory")
+                .accessibilityAction { onContextAction(.toggleSizePanel) }
+                .tabBarButtonAnimationsDisabled()
+                .frame(width: rect.width, height: rect.height)
+                .offset(x: rect.minX, y: rect.minY)
+            }
         }
     }
 
@@ -554,39 +612,15 @@ struct TabItemView: View {
                         debugRecordGeometry(which: "title", frame: frame)
                     }
 
-                if let presence = tab.presence {
-                    Button {
-                        onContextAction(.showSizePanel)
-                    } label: {
-                        TabPresenceAccessoryView(
-                            presence: presence,
-                            borderColor: isSelected
-                                ? TabBarColors.activeTabBackground(for: appearance)
-                                : TabBarColors.barBackground(for: appearance),
-                            textColor: isSelected
-                                ? TabBarColors.activeText(for: appearance)
-                                : TabBarColors.inactiveText(for: appearance),
-                            isHovered: isPresenceHovered,
-                            hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hovering in
-                        withTransaction(Transaction(animation: nil)) {
-                            isPresenceHovered = hovering
-                        }
-                    }
-                    .saturation(saturation)
-                    .safeHelp(presence.accessibilityLabel)
-                    .accessibilityLabel(presence.accessibilityLabel)
-                    .accessibilityHint(
-                        Bundle.module.localizedString(
-                            forKey: "tabPresence.showSizePanel",
-                            value: "Shows the terminal size panel",
-                            table: nil
-                        )
-                    )
-                    .tabBarButtonAnimationsDisabled()
+                if let presence = tab.presence, presence.showsAccessory {
+                    // Reserves the accessory's space in the title row. The live
+                    // button is drawn by `presenceAccessoryOverlay`, outside the
+                    // tab's combined accessibility element, so it stays its own
+                    // AXButton.
+                    presenceAccessory(presence)
+                        .hidden()
+                        .accessibilityHidden(true)
+                        .anchorPreference(key: TabPresenceAccessoryBoundsKey.self, value: .bounds) { $0 }
                 }
 
                 if tab.showsRemoteIndicator {
@@ -1641,7 +1675,9 @@ enum TabContextMenuBuilder {
         return menu
     }
 
-    /// Adds the shared-terminal size actions for a tab that has presence.
+    /// Adds the shared-terminal size actions for a tab that has presence:
+    /// Size to My Window, a Terminal Size submenu, and Disconnect Others…
+    /// while anyone else is attached.
     private static func addTerminalSizeSection(
         presence: TabPresence,
         state: TabContextMenuState,
@@ -1656,56 +1692,38 @@ enum TabContextMenuBuilder {
             target: target,
             to: menu
         )
-        addAction(
-            title: localized("tabContext.dontResizeFromThisMac", defaultValue: "Don't Resize from This Mac"),
-            action: .toggleSizeCountsFromThisDevice,
-            state: state,
-            target: target,
-            to: menu,
-            stateValue: presence.countsFromThisDevice ? .off : .on
-        )
-        menu.addItem(.separator())
-        let header = NSMenuItem(
-            title: localized("tabContext.terminalSizeHeader", defaultValue: "Terminal Size"),
-            action: nil,
-            keyEquivalent: ""
-        )
-        header.isEnabled = false
-        menu.addItem(header)
+        let sizeTitle = localized("tabContext.terminalSizeHeader", defaultValue: "Terminal Size")
+        let sizeItem = NSMenuItem(title: sizeTitle, action: nil, keyEquivalent: "")
+        let sizeMenu = NSMenu(title: sizeTitle)
         for mode in TabPresence.SizeMode.allCases {
             addAction(
                 title: sizeModeTitle(mode),
                 action: .sizeMode(mode),
                 state: state,
                 target: target,
-                to: menu,
+                to: sizeMenu,
                 stateValue: presence.sizeMode == mode ? .on : .off
             )
         }
-        menu.addItem(.separator())
-        addAction(
-            title: localized("tabContext.showSizePanel", defaultValue: "Show Size Panel…"),
-            action: .showSizePanel,
-            state: state,
-            target: target,
-            to: menu
-        )
-        addAction(
-            title: localized("tabContext.disconnectOtherClients", defaultValue: "Disconnect Other Clients…"),
-            action: .disconnectOtherClients,
-            enabled: presence.canDisconnectOthers,
-            state: state,
-            target: target,
-            to: menu
-        )
+        sizeItem.submenu = sizeMenu
+        menu.addItem(sizeItem)
+        if presence.canDisconnectOthers {
+            addAction(
+                title: localized("tabContext.disconnectOthers", defaultValue: "Disconnect Others…"),
+                action: .disconnectOtherClients,
+                state: state,
+                target: target,
+                to: menu
+            )
+        }
     }
 
     private static func sizeModeTitle(_ mode: TabPresence.SizeMode) -> String {
         switch mode {
         case .latest:
-            return localized("tabContext.sizeMode.latest", defaultValue: "Follow Latest Input")
+            return localized("tabContext.sizeMode.followLatest", defaultValue: "Follow Latest")
         case .smallest:
-            return localized("tabContext.sizeMode.smallest", defaultValue: "Fit Everyone (Smallest)")
+            return localized("tabContext.sizeMode.fitEveryone", defaultValue: "Fit Everyone")
         case .largest:
             return localized("tabContext.sizeMode.largest", defaultValue: "Largest Window")
         case .priority:
@@ -1907,13 +1925,12 @@ enum TabContextMenuBuilder {
              .toggleFullWidthTab,
              .disconnectRemote,
              .sizeToMyWindow,
-             .toggleSizeCountsFromThisDevice,
              .sizeModeLatest,
              .sizeModeSmallest,
              .sizeModeLargest,
              .sizeModePriority,
              .sizeModeFixed,
-             .showSizePanel,
+             .toggleSizePanel,
              .disconnectOtherClients:
             assertionFailure("Non-fork action cannot be the default fork destination: \(action)")
             return localized(

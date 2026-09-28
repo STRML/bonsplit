@@ -45,13 +45,11 @@
 
 /* Shared terminal sizing */
 "tabContext.sizeToMyWindow" = "ウィンドウにサイズを合わせる";
-"tabContext.dontResizeFromThisMac" = "このMacからはサイズを変更しない";
 "tabContext.terminalSizeHeader" = "ターミナルサイズ";
-"tabContext.sizeMode.latest" = "最新の入力に合わせる";
-"tabContext.sizeMode.smallest" = "全員に合わせる（最小）";
 "tabContext.sizeMode.largest" = "最大のウィンドウ";
 "tabContext.sizeMode.priority" = "優先リスト…";
 "tabContext.sizeMode.fixed" = "固定サイズ…";
-"tabContext.showSizePanel" = "サイズパネルを表示…";
-"tabContext.disconnectOtherClients" = "他のクライアントを切断…";
-"tabPresence.showSizePanel" = "ターミナルサイズパネルを表示します";
+"tabContext.disconnectOthers" = "他の接続を切断…";
+"tabContext.sizeMode.followLatest" = "最新の入力に合わせる";
+"tabContext.sizeMode.fitEveryone" = "全員に合わせる";
+"tabPresence.toggleSizePanel" = "ターミナルサイズパネルを表示または非表示にします";

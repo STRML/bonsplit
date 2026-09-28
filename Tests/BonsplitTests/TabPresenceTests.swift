@@ -4,19 +4,21 @@ import AppKit
 import SwiftUI
 
 final class TabPresenceTests: XCTestCase {
-    private func samplePresence(mode: TabPresence.SizeMode = .priority, counts: Bool = false, canDisconnect: Bool = false) -> TabPresence {
+    private func samplePresence(mode: TabPresence.SizeMode = .priority, canDisconnect: Bool = false, alone: Bool = false) -> TabPresence {
         TabPresence(
-            participants: [
+            participants: alone ? [] : [
                 .init(id: "c3", initials: "MO", colorHex: "#3CC2B0", isOwner: true, accessibilityName: "Maya Ortiz"),
                 .init(id: "mobile:1", initials: "DV", colorHex: "#EBA946", isOwner: false, accessibilityName: "Dev"),
             ],
-            gridLabel: "118×38",
-            viewerMismatch: true,
             sizeMode: mode,
-            countsFromThisDevice: counts,
             canDisconnectOthers: canDisconnect,
-            accessibilityLabel: "118 × 38, Maya Ortiz sets the size"
+            accessibilityLabel: "Size set by Maya's Mac · 118×38"
         )
+    }
+
+    func testAccessoryShowsOnlyWithParticipants() {
+        XCTAssertTrue(samplePresence().showsAccessory)
+        XCTAssertFalse(samplePresence(alone: true).showsAccessory)
     }
 
     func testTabItemCodableRoundTripsPresence() throws {
@@ -50,7 +52,7 @@ final class TabPresenceTests: XCTestCase {
         for mode in TabPresence.SizeMode.allCases {
             XCTAssertEqual(TabContextAction.sizeMode(mode).sizeMode, mode)
         }
-        XCTAssertNil(TabContextAction.showSizePanel.sizeMode)
+        XCTAssertNil(TabContextAction.toggleSizePanel.sizeMode)
     }
 
     @MainActor
@@ -78,23 +80,51 @@ final class TabPresenceTests: XCTestCase {
 
         XCTAssertFalse(menu(presence: nil).items.contains { $0.title == "Size to My Window" })
 
-        let withPresence = menu(presence: samplePresence(mode: .priority, counts: false, canDisconnect: false))
-        let titles = withPresence.items.map(\.title)
-        for title in ["Size to My Window", "Don't Resize from This Mac", "Terminal Size",
-                      "Follow Latest Input", "Fit Everyone (Smallest)", "Largest Window",
-                      "Priority List…", "Fixed Size…", "Show Size Panel…", "Disconnect Other Clients…"] {
-            XCTAssertTrue(titles.contains(title), "missing \(title)")
+        let alone = menu(presence: samplePresence(mode: .priority, canDisconnect: false, alone: true))
+        let titles = alone.items.map(\.title)
+        XCTAssertTrue(titles.contains("Size to My Window"))
+        XCTAssertFalse(titles.contains("Disconnect Others…"))
+        for removed in ["Don't Resize from This Mac", "Show Size Panel…"] {
+            XCTAssertFalse(titles.contains(removed), "unexpected \(removed)")
         }
-        let dontResize = try XCTUnwrap(withPresence.items.first { $0.title == "Don't Resize from This Mac" })
-        XCTAssertEqual(dontResize.state, .on)
-        XCTAssertEqual(withPresence.items.first { $0.title == "Priority List…" }?.state, .on)
-        XCTAssertEqual(withPresence.items.first { $0.title == "Follow Latest Input" }?.state, .off)
-        XCTAssertEqual(withPresence.items.first { $0.title == "Disconnect Other Clients…" }?.isEnabled, false)
-        XCTAssertEqual(withPresence.items.first { $0.title == "Terminal Size" }?.isEnabled, false)
+        let sizeMenu = try XCTUnwrap(alone.items.first { $0.title == "Terminal Size" }?.submenu)
+        XCTAssertEqual(
+            sizeMenu.items.map(\.title),
+            ["Follow Latest", "Fit Everyone", "Largest Window", "Priority List…", "Fixed Size…"]
+        )
+        XCTAssertEqual(sizeMenu.items.first { $0.title == "Priority List…" }?.state, .on)
+        XCTAssertEqual(sizeMenu.items.first { $0.title == "Follow Latest" }?.state, .off)
 
-        let largest = try XCTUnwrap(withPresence.items.first { $0.title == "Largest Window" })
+        let shared = menu(presence: samplePresence(mode: .latest, canDisconnect: true))
+        XCTAssertTrue(shared.items.contains { $0.title == "Disconnect Others…" })
+
+        let largest = try XCTUnwrap(sizeMenu.items.first { $0.title == "Largest Window" })
         target.performContextAction(largest)
         XCTAssertEqual(selected, .sizeModeLargest)
+    }
+
+    @MainActor
+    func testPopoverAnchorPrefersVisibleAccessoryOverTabItem() {
+        let controller = BonsplitController()
+        let tabId = TabID()
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 300, height: 100), styleMask: [], backing: .buffered, defer: true)
+        let content = NSView(frame: window.contentLayoutRect)
+        window.contentView = content
+
+        let item = TabPopoverAnchorView.AnchorNSView(frame: NSRect(x: 0, y: 0, width: 120, height: 30))
+        content.addSubview(item)
+        item.configure(tabId: tabId.id, kind: .tabItem)
+        XCTAssertTrue(controller.popoverAnchorView(for: tabId) === item)
+
+        let accessory = TabPopoverAnchorView.AnchorNSView(frame: NSRect(x: 80, y: 5, width: 30, height: 18))
+        content.addSubview(accessory)
+        accessory.configure(tabId: tabId.id, kind: .presenceAccessory)
+        XCTAssertTrue(controller.popoverAnchorView(for: tabId) === accessory)
+
+        accessory.removeFromSuperview()
+        XCTAssertTrue(controller.popoverAnchorView(for: tabId) === item)
+        item.isHidden = true
+        XCTAssertNil(controller.popoverAnchorView(for: tabId))
     }
 
     func testHexColorParsing() {

@@ -39,8 +39,6 @@ public enum TabContextAction: String, CaseIterable, Sendable {
     case forkConversationNewWorkspace
     /// Makes this device's window set the shared terminal's size.
     case sizeToMyWindow
-    /// Toggles whether this device counts toward the shared terminal's size.
-    case toggleSizeCountsFromThisDevice
     /// Sets the shared terminal's sizing mode to ``TabPresence/SizeMode/latest``.
     case sizeModeLatest
     /// Sets the sizing mode to ``TabPresence/SizeMode/smallest``.
@@ -51,8 +49,9 @@ public enum TabContextAction: String, CaseIterable, Sendable {
     case sizeModePriority
     /// Sets the sizing mode to ``TabPresence/SizeMode/fixed``.
     case sizeModeFixed
-    /// Opens the host's terminal size panel.
-    case showSizePanel
+    /// Opens the host's terminal size panel, or closes it when it is already
+    /// open for this tab. Sent by the presence accessory.
+    case toggleSizePanel
     /// Asks the host to disconnect every other client of the terminal.
     case disconnectOtherClients
 

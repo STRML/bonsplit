@@ -2,9 +2,9 @@ import Foundation
 
 /// Who is viewing a shared terminal tab and what size its grid has.
 ///
-/// The host app fills this from its terminal sizing state. Bonsplit renders it
-/// as a presence accessory after the tab title and adds the terminal-size
-/// section to the tab context menu. A `nil` presence hides both.
+/// The host app fills this from its terminal sizing state. Bonsplit renders the
+/// participants as an avatar accessory after the tab title and adds the
+/// terminal-size section to the tab context menu. A `nil` presence hides both.
 public struct TabPresence: Hashable, Sendable, Codable {
     /// One attached person or device shown in the tab's avatar stack.
     public struct Participant: Hashable, Sendable, Codable, Identifiable {
@@ -50,45 +50,34 @@ public struct TabPresence: Hashable, Sendable, Codable {
         case fixed
     }
 
-    /// Attached participants, in display order.
+    /// Attached participants, owner first. Empty hides the tab accessory
+    /// while keeping the terminal-size context menu section.
     public var participants: [Participant]
-    /// Grid label drawn after the avatars, for example `118×38`.
-    public var gridLabel: String
-    /// Whether this device's window does not match the grid (draws a dashed-box glyph).
-    public var viewerMismatch: Bool
     /// The current sizing mode, checked in the context menu.
     public var sizeMode: SizeMode
-    /// Whether this device counts toward the size. `false` checks "Don't Resize from This Mac".
-    public var countsFromThisDevice: Bool
-    /// Whether "Disconnect Other Clients…" is enabled.
+    /// Whether "Disconnect Others…" appears in the context menu.
     public var canDisconnectOthers: Bool
-    /// Label for the accessory button and its help tooltip.
+    /// Label and tooltip for the accessory, e.g. `Size set by Maya's Mac · 118×38`.
     public var accessibilityLabel: String
+
+    /// Whether the tab draws the avatar accessory.
+    public var showsAccessory: Bool { !participants.isEmpty }
 
     /// Creates a presence snapshot.
     ///
     /// - Parameters:
-    ///   - participants: Attached participants.
-    ///   - gridLabel: Grid label such as `118×38`.
-    ///   - viewerMismatch: Whether this device's window differs from the grid.
+    ///   - participants: Attached participants, owner first; empty hides the accessory.
     ///   - sizeMode: Current sizing mode.
-    ///   - countsFromThisDevice: Whether this device counts toward size.
     ///   - canDisconnectOthers: Whether other clients can be disconnected.
     ///   - accessibilityLabel: Accessory label and tooltip.
     public init(
         participants: [Participant],
-        gridLabel: String,
-        viewerMismatch: Bool,
         sizeMode: SizeMode,
-        countsFromThisDevice: Bool,
         canDisconnectOthers: Bool,
         accessibilityLabel: String
     ) {
         self.participants = participants
-        self.gridLabel = gridLabel
-        self.viewerMismatch = viewerMismatch
         self.sizeMode = sizeMode
-        self.countsFromThisDevice = countsFromThisDevice
         self.canDisconnectOthers = canDisconnectOthers
         self.accessibilityLabel = accessibilityLabel
     }
