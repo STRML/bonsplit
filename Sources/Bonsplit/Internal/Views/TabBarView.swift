@@ -723,6 +723,8 @@ struct TabContextMenuState {
     let hasSplits: Bool
     let shortcuts: [TabContextAction: KeyboardShortcut]
     var canDisconnectRemote: Bool = false
+    /// Shared-terminal presence; non-nil adds the terminal-size menu section.
+    var presence: TabPresence?
 
     var canMarkAsUnread: Bool {
         !isUnread
@@ -750,7 +752,8 @@ struct TabContextMenuState {
         isFullWidthTabMode: Bool = false,
         hasSplits: Bool,
         shortcuts: [TabContextAction: KeyboardShortcut],
-        canDisconnectRemote: Bool = false
+        canDisconnectRemote: Bool = false,
+        presence: TabPresence? = nil
     ) {
         self.isPinned = isPinned
         self.isUnread = isUnread
@@ -770,6 +773,7 @@ struct TabContextMenuState {
         self.hasSplits = hasSplits
         self.shortcuts = shortcuts
         self.canDisconnectRemote = canDisconnectRemote
+        self.presence = presence
     }
 
     @MainActor
@@ -811,7 +815,8 @@ struct TabContextMenuState {
             isFullWidthTabMode: pane.isFullWidthTabMode,
             hasSplits: splitViewController.rootNode.allPaneIds.count > 1,
             shortcuts: controller.contextMenuShortcuts,
-            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false
+            canDisconnectRemote: controller.tabContextDisconnectRemoteAvailabilityProvider?(TabID(id: tab.id), pane.id) ?? false,
+            presence: tab.presence
         )
     }
 }

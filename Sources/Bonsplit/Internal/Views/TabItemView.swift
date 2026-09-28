@@ -299,6 +299,7 @@ struct TabItemView: View {
     @State private var closeButtonPointerInside = false
     @State private var isZoomHovered = false
     @State private var isAudioHovered = false
+    @State private var isPresenceHovered = false
     @State private var showGlobeFallback = true
     @State private var globeFallbackScheduler = TabIconFallbackScheduler()
     @State private var lastIsLoadingObserved = false
@@ -552,6 +553,41 @@ struct TabItemView: View {
                     .tabGeometryDebugFrame { frame in
                         debugRecordGeometry(which: "title", frame: frame)
                     }
+
+                if let presence = tab.presence {
+                    Button {
+                        onContextAction(.showSizePanel)
+                    } label: {
+                        TabPresenceAccessoryView(
+                            presence: presence,
+                            borderColor: isSelected
+                                ? TabBarColors.activeTabBackground(for: appearance)
+                                : TabBarColors.barBackground(for: appearance),
+                            textColor: isSelected
+                                ? TabBarColors.activeText(for: appearance)
+                                : TabBarColors.inactiveText(for: appearance),
+                            isHovered: isPresenceHovered,
+                            hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .onHover { hovering in
+                        withTransaction(Transaction(animation: nil)) {
+                            isPresenceHovered = hovering
+                        }
+                    }
+                    .saturation(saturation)
+                    .safeHelp(presence.accessibilityLabel)
+                    .accessibilityLabel(presence.accessibilityLabel)
+                    .accessibilityHint(
+                        Bundle.module.localizedString(
+                            forKey: "tabPresence.showSizePanel",
+                            value: "Shows the terminal size panel",
+                            table: nil
+                        )
+                    )
+                    .tabBarButtonAnimationsDisabled()
+                }
 
                 if tab.showsRemoteIndicator {
                     Image(systemName: "network")
@@ -1409,6 +1445,10 @@ enum TabContextMenuBuilder {
             )
         }
 
+        if let presence = state.presence {
+            addTerminalSizeSection(presence: presence, state: state, target: target, to: menu)
+        }
+
         menu.addItem(.separator())
 
         addAction(
@@ -1601,6 +1641,80 @@ enum TabContextMenuBuilder {
         return menu
     }
 
+    /// Adds the shared-terminal size actions for a tab that has presence.
+    private static func addTerminalSizeSection(
+        presence: TabPresence,
+        state: TabContextMenuState,
+        target: TabContextMenuActionTarget,
+        to menu: NSMenu
+    ) {
+        menu.addItem(.separator())
+        addAction(
+            title: localized("tabContext.sizeToMyWindow", defaultValue: "Size to My Window"),
+            action: .sizeToMyWindow,
+            state: state,
+            target: target,
+            to: menu
+        )
+        addAction(
+            title: localized("tabContext.dontResizeFromThisMac", defaultValue: "Don't Resize from This Mac"),
+            action: .toggleSizeCountsFromThisDevice,
+            state: state,
+            target: target,
+            to: menu,
+            stateValue: presence.countsFromThisDevice ? .off : .on
+        )
+        menu.addItem(.separator())
+        let header = NSMenuItem(
+            title: localized("tabContext.terminalSizeHeader", defaultValue: "Terminal Size"),
+            action: nil,
+            keyEquivalent: ""
+        )
+        header.isEnabled = false
+        menu.addItem(header)
+        for mode in TabPresence.SizeMode.allCases {
+            addAction(
+                title: sizeModeTitle(mode),
+                action: .sizeMode(mode),
+                state: state,
+                target: target,
+                to: menu,
+                stateValue: presence.sizeMode == mode ? .on : .off
+            )
+        }
+        menu.addItem(.separator())
+        addAction(
+            title: localized("tabContext.showSizePanel", defaultValue: "Show Size Panel…"),
+            action: .showSizePanel,
+            state: state,
+            target: target,
+            to: menu
+        )
+        addAction(
+            title: localized("tabContext.disconnectOtherClients", defaultValue: "Disconnect Other Clients…"),
+            action: .disconnectOtherClients,
+            enabled: presence.canDisconnectOthers,
+            state: state,
+            target: target,
+            to: menu
+        )
+    }
+
+    private static func sizeModeTitle(_ mode: TabPresence.SizeMode) -> String {
+        switch mode {
+        case .latest:
+            return localized("tabContext.sizeMode.latest", defaultValue: "Follow Latest Input")
+        case .smallest:
+            return localized("tabContext.sizeMode.smallest", defaultValue: "Fit Everyone (Smallest)")
+        case .largest:
+            return localized("tabContext.sizeMode.largest", defaultValue: "Largest Window")
+        case .priority:
+            return localized("tabContext.sizeMode.priority", defaultValue: "Priority List…")
+        case .fixed:
+            return localized("tabContext.sizeMode.fixed", defaultValue: "Fixed Size…")
+        }
+    }
+
     static func updateForkConversationAvailability(
         _ availability: TabContextForkConversationAvailability,
         in menu: NSMenu
@@ -1791,7 +1905,16 @@ enum TabContextMenuBuilder {
              .markAsUnread,
              .toggleZoom,
              .toggleFullWidthTab,
-             .disconnectRemote:
+             .disconnectRemote,
+             .sizeToMyWindow,
+             .toggleSizeCountsFromThisDevice,
+             .sizeModeLatest,
+             .sizeModeSmallest,
+             .sizeModeLargest,
+             .sizeModePriority,
+             .sizeModeFixed,
+             .showSizePanel,
+             .disconnectOtherClients:
             assertionFailure("Non-fork action cannot be the default fork destination: \(action)")
             return localized(
                 "tabContext.forkConversation.default.right",

@@ -42,3 +42,16 @@
 "tabContext.disconnectRemote" = "Disconnect SSH";
 "tabContext.remoteConnectedAccessibility" = "Connected over SSH";
 "tab.close.accessibilityLabel" = "Close Tab";
+
+/* Shared terminal sizing */
+"tabContext.sizeToMyWindow" = "Size to My Window";
+"tabContext.dontResizeFromThisMac" = "Don't Resize from This Mac";
+"tabContext.terminalSizeHeader" = "Terminal Size";
+"tabContext.sizeMode.latest" = "Follow Latest Input";
+"tabContext.sizeMode.smallest" = "Fit Everyone (Smallest)";
+"tabContext.sizeMode.largest" = "Largest Window";
+"tabContext.sizeMode.priority" = "Priority List…";
+"tabContext.sizeMode.fixed" = "Fixed Size…";
+"tabContext.showSizePanel" = "Show Size Panel…";
+"tabContext.disconnectOtherClients" = "Disconnect Other Clients…";
+"tabPresence.showSizePanel" = "Shows the terminal size panel";
