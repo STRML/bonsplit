@@ -263,6 +263,30 @@ enum TabBarColors {
         return tone.withAlphaComponent(alpha)
     }
 
+    /// Colors of the shared-terminal presence accessory on a tab.
+    struct PresenceColors {
+        /// The surface under the accessory (tab fill or bar).
+        let surface: NSColor
+        let fill: NSColor
+        let glyph: NSColor
+        let text: NSColor
+        let line: NSColor
+    }
+
+    static func presenceColors(
+        for appearance: BonsplitConfiguration.Appearance,
+        isSelected: Bool
+    ) -> PresenceColors {
+        let separator = nsColorSeparator(for: appearance)
+        return PresenceColors(
+            surface: nsColorBarBackground(for: appearance),
+            fill: separator.withAlphaComponent(separator.alphaComponent * 0.6),
+            glyph: .secondaryLabelColor,
+            text: effectiveTextColor(for: appearance, secondary: true),
+            line: separator
+        )
+    }
+
     static var dropIndicator: Color {
         Color.accentColor
     }
