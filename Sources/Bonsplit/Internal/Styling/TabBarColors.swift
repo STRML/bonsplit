@@ -106,6 +106,13 @@ enum TabBarColors {
         return NSColor.white.withAlphaComponent(alpha)
     }
 
+    /// Whether chrome drawn over the tab bar should use its dark palette:
+    /// the same WCAG choice as the tab text, or `nil` without a custom
+    /// background, where the view's color scheme decides.
+    static func usesDarkChrome(for appearance: BonsplitConfiguration.Appearance) -> Bool? {
+        semanticTabBarBackgroundColor(for: appearance).map { !$0.isBonsplitLightColor }
+    }
+
     static func paneBackground(for appearance: BonsplitConfiguration.Appearance) -> Color {
         Color(nsColor: paneBackgroundColor(for: appearance) ?? .textBackgroundColor)
     }

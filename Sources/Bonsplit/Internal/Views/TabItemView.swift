@@ -107,10 +107,22 @@ enum TabControlShortcutHintStyle {
     static let fontWeight: Font.Weight = .semibold
     static let nsFontWeight: NSFont.Weight = .semibold
     static let fontDesign: Font.Design = .rounded
-    static let foregroundColor = Color.primary
+    /// Opaque palette shared with the host's shortcut-hint pills so every
+    /// Cmd-hold hint reads the same in both schemes: about 11:1 on dark
+    /// chrome and 12:1 on light chrome, independent of what is behind it.
+    static func foregroundColor(isDark: Bool) -> Color {
+        isDark ? Color.white.opacity(0.95) : Color.black.opacity(0.85)
+    }
+    static func backgroundColor(isDark: Bool) -> Color {
+        isDark
+            ? Color(.sRGB, red: 0x3A / 255, green: 0x3A / 255, blue: 0x3C / 255, opacity: 1)
+            : Color.white
+    }
+    static func borderColor(isDark: Bool) -> Color {
+        isDark ? Color.white.opacity(0.18) : Color.black.opacity(0.12)
+    }
     static let horizontalPadding: CGFloat = 6
     static let verticalPadding: CGFloat = 2
-    static let strokeOpacity = 0.30
     static let strokeWidth: CGFloat = 0.8
     static let shadowOpacity = 0.22
     static let shadowRadius: CGFloat = 2
@@ -129,13 +141,15 @@ enum TabControlShortcutHintStyle {
 }
 
 struct TabControlShortcutHintPillBackground: View {
+    let isDark: Bool
+
     var body: some View {
         Capsule(style: .continuous)
-            .fill(.regularMaterial)
+            .fill(TabControlShortcutHintStyle.backgroundColor(isDark: isDark))
             .overlay(
                 Capsule(style: .continuous)
                     .stroke(
-                        Color.white.opacity(TabControlShortcutHintStyle.strokeOpacity),
+                        TabControlShortcutHintStyle.borderColor(isDark: isDark),
                         lineWidth: TabControlShortcutHintStyle.strokeWidth
                     )
             )
@@ -150,17 +164,21 @@ struct TabControlShortcutHintPillBackground: View {
 
 struct TabControlShortcutHintPill: View {
     let text: String
+    /// The tab bar's own light/dark choice; `nil` follows the color scheme.
+    var usesDarkChrome: Bool? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
+        let isDark = usesDarkChrome ?? (colorScheme == .dark)
         Text(text)
             .font(TabControlShortcutHintStyle.font)
             .monospacedDigit()
             .lineLimit(1)
             .fixedSize(horizontal: true, vertical: false)
-            .foregroundColor(TabControlShortcutHintStyle.foregroundColor)
+            .foregroundColor(TabControlShortcutHintStyle.foregroundColor(isDark: isDark))
             .padding(.horizontal, TabControlShortcutHintStyle.horizontalPadding)
             .padding(.vertical, TabControlShortcutHintStyle.verticalPadding)
-            .background(TabControlShortcutHintPillBackground())
+            .background(TabControlShortcutHintPillBackground(isDark: isDark))
     }
 }
 
@@ -684,7 +702,7 @@ struct TabItemView: View {
                 .allowsHitTesting(!showsShortcutHint)
 
             if let shortcutHintLabel {
-                TabControlShortcutHintPill(text: shortcutHintLabel)
+                TabControlShortcutHintPill(text: shortcutHintLabel, usesDarkChrome: TabBarColors.usesDarkChrome(for: appearance))
                     .opacity(showsShortcutHint ? 1 : 0)
                     .allowsHitTesting(false)
             }
@@ -923,7 +941,7 @@ struct TabItemView: View {
     private var trailingAccessory: some View {
         ZStack(alignment: .center) {
             if let shortcutHintLabel {
-                TabControlShortcutHintPill(text: shortcutHintLabel)
+                TabControlShortcutHintPill(text: shortcutHintLabel, usesDarkChrome: TabBarColors.usesDarkChrome(for: appearance))
                     .offset(
                         x: TabControlShortcutHintDebugSettings.clamped(controlShortcutHintXOffset),
                         y: TabControlShortcutHintDebugSettings.clamped(controlShortcutHintYOffset)

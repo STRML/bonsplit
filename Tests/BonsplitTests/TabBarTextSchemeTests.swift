@@ -20,6 +20,14 @@ final class TabBarTextSchemeTests: XCTestCase {
         XCTAssertFalse(activeTextIsDark(onBackgroundHex: "#272822"))
     }
 
+    func testShortcutHintPillFollowsTheTabBarChoice() {
+        let red = BonsplitConfiguration.Appearance(chromeColors: .init(backgroundHex: "#E44330"))
+        let dark = BonsplitConfiguration.Appearance(chromeColors: .init(backgroundHex: "#272822"))
+        XCTAssertEqual(TabBarColors.usesDarkChrome(for: red), false)
+        XCTAssertEqual(TabBarColors.usesDarkChrome(for: dark), true)
+        XCTAssertNil(TabBarColors.usesDarkChrome(for: BonsplitConfiguration.Appearance()))
+    }
+
     private func activeTextIsDark(onBackgroundHex hex: String) -> Bool {
         let appearance = BonsplitConfiguration.Appearance(chromeColors: .init(backgroundHex: hex))
         let text = TabBarColors.nsColorActiveText(for: appearance).usingColorSpace(.sRGB)!
