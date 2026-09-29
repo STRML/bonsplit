@@ -3,16 +3,12 @@ import SwiftUI
 /// The shared-terminal presence accessory drawn after a tab title: up to
 /// three overlapping avatars (initials for other people, a device glyph for
 /// the viewer's own other devices), a thin ring on the owner, and `+N` for the
-/// rest. Avatars and the ring use the appearance's separator grey (the split
-/// divider and tab-bar separator color). No per-participant colors.
+/// rest. Neutral colors derived from the tab surface and the tab bar's text
+/// color (``TabBarColors/presenceColors(for:isSelected:)``), with 4.5:1
+/// glyphs and 3:1 rings on any theme. No per-participant colors.
 struct TabPresenceAccessoryView: View {
     let presence: TabPresence
-    /// Fill behind the tab, used for the avatar separation border.
-    let borderColor: Color
-    let textColor: Color
-    /// The split divider / tab-bar separator grey; the owner ring draws in it
-    /// and avatar fills derive from it.
-    let separatorColor: Color
+    let colors: TabBarColors.PresenceColors
     let isHovered: Bool
     let hoverBackground: Color
 
@@ -20,7 +16,6 @@ struct TabPresenceAccessoryView: View {
     private static let avatarSize: CGFloat = 14
     private static let overlap: CGFloat = 4
     private static let ringWidth: CGFloat = 1
-    private static let avatarFillOpacity: Double = 0.6
 
     var body: some View {
         let shown = Array(presence.participants.prefix(Self.maxAvatars))
@@ -34,7 +29,7 @@ struct TabPresenceAccessoryView: View {
             if extra > 0 {
                 Text(verbatim: "+\(extra)")
                     .font(.system(size: 9, weight: .semibold).monospacedDigit())
-                    .foregroundStyle(textColor.opacity(0.7))
+                    .foregroundStyle(Color(nsColor: colors.text))
                     .padding(.leading, Self.overlap + 3)
                     .fixedSize()
             }
@@ -50,28 +45,27 @@ struct TabPresenceAccessoryView: View {
 
     private func avatar(_ participant: TabPresence.Participant) -> some View {
         ZStack {
-            // Opaque base so overlapping avatars do not show through each other.
-            Circle().fill(borderColor)
-            Circle().fill(separatorColor.opacity(Self.avatarFillOpacity))
+            // Opaque, so overlapping avatars do not show through each other.
+            Circle().fill(Color(nsColor: colors.fill))
             if let symbolName = participant.symbolName {
                 Image(systemName: symbolName)
                     .font(.system(size: 7, weight: .medium))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .foregroundStyle(Color(nsColor: colors.glyph))
             } else {
                 Text(verbatim: participant.initials)
                     .font(.system(size: 7, weight: .semibold))
-                    .foregroundStyle(Color(nsColor: .secondaryLabelColor))
+                    .foregroundStyle(Color(nsColor: colors.glyph))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
             }
         }
         .frame(width: Self.avatarSize, height: Self.avatarSize)
-        .overlay(Circle().stroke(borderColor, lineWidth: 1))
+        .overlay(Circle().stroke(Color(nsColor: colors.surface), lineWidth: 1))
         .overlay {
             if participant.isOwner {
                 Circle()
                     .inset(by: -(Self.ringWidth + 0.5))
-                    .stroke(separatorColor, lineWidth: Self.ringWidth)
+                    .stroke(Color(nsColor: colors.line), lineWidth: Self.ringWidth)
             }
         }
         .padding(participant.isOwner ? Self.ringWidth + 0.5 : 0)

@@ -1,7 +1,9 @@
 import AppKit
 
-/// Neutral colors for chrome drawn on a themed surface (the shared-terminal
-/// presence accessory and sizing bounds).
+/// Neutral colors for chrome drawn on a themed surface: the shared-terminal
+/// presence accessory on a tab, and hosts' sizing bounds on a pane. Every
+/// role derives from the actual surface (``background``) and its text color
+/// (``foreground``), with contrast floors that hold on any theme.
 public struct BonsplitContrastPalette: Equatable, Sendable {
     /// An opaque gamma-encoded sRGB color, components in 0...1.
     public struct RGB: Equatable, Hashable, Sendable {
@@ -44,33 +46,139 @@ public struct BonsplitContrastPalette: Equatable, Sendable {
         }
     }
 
+    /// Minimum contrast of glyphs, initials and chip text against the fill.
+    public static let glyphContrastFloor = 4.5
+    /// Minimum contrast of text drawn directly on the background.
+    public static let textContrastFloor = 4.5
+    /// Minimum contrast of rings, borders and outlines against the background.
+    public static let lineContrastFloor = 3.0
+    /// Minimum contrast that keeps a fill visible against the background.
+    public static let fillContrastFloor = 1.2
+    /// Minimum contrast that keeps hatch lines visible against the background.
+    public static let hatchContrastFloor = 1.3
+
+    /// Share of the foreground mixed into the background for each role.
+    static let fillMix = 0.14
+    static let hatchMix = 0.22
+    static let lineMix = 0.4
+    static let glyphMix = 0.72
+    static let textMix = 0.72
+    /// Headroom above each floor so 8-bit rendering never drops below it.
+    static let floorMargin = 0.03
+
+    /// The surface the chrome sits on.
     public let background: RGB
+    /// The text color of that surface; every role mixes toward it.
     public let foreground: RGB
+    /// Avatar and chip fill: subtle, always visibly off the background.
     public let fill: RGB
+    /// Glyphs, initials and chip text drawn on ``fill``.
     public let glyph: RGB
+    /// Text drawn on ``background`` (for example `+2`).
     public let text: RGB
+    /// Owner ring, grid border and chip outline.
     public let line: RGB
+    /// Hatch lines outside the grid.
     public let hatch: RGB
 
+    /// WCAG 2 contrast ratio, 1...21.
     public static func contrastRatio(_ a: RGB, _ b: RGB) -> Double {
         let la = a.relativeLuminance, lb = b.relativeLuminance
         return (max(la, lb) + 0.05) / (min(la, lb) + 0.05)
     }
 
-    // Stub: the separator-grey behavior this palette replaces.
+    /// Derives every role by mixing `foreground` into `background` in
+    /// gamma-encoded sRGB at a fixed ratio, then moving the result toward
+    /// black or white until its contrast floor holds (WCAG 2 relative
+    /// luminance). Neutral themes give neutral greys; the only hue is the
+    /// theme's own background and foreground.
     public init(background: RGB, foreground: RGB) {
         self.background = background
         self.foreground = foreground
-        let light = background.relativeLuminance > 0.18
-        let tone = light
-            ? RGB(red: background.red - 0.12, green: background.green - 0.12, blue: background.blue - 0.12)
-            : RGB(red: background.red + 0.16, green: background.green + 0.16, blue: background.blue + 0.16)
-        let alpha = light ? 0.26 : 0.36
-        fill = background.mixed(toward: tone, by: alpha * 0.6)
-        line = background.mixed(toward: tone, by: alpha)
-        hatch = background.mixed(toward: tone, by: alpha * 0.35)
-        glyph = RGB(red: 0.6, green: 0.6, blue: 0.6)
-        text = glyph
+        let fill = Self.ensuring(
+            background.mixed(toward: foreground, by: Self.fillMix),
+            floor: Self.fillContrastFloor, against: background, toward: foreground
+        )
+        self.fill = fill
+        hatch = Self.ensuring(
+            background.mixed(toward: foreground, by: Self.hatchMix),
+            floor: Self.hatchContrastFloor, against: background, toward: foreground
+        )
+        line = Self.ensuring(
+            background.mixed(toward: foreground, by: Self.lineMix),
+            floor: Self.lineContrastFloor, against: background, toward: foreground
+        )
+        glyph = Self.ensuring(
+            fill.mixed(toward: foreground, by: Self.glyphMix),
+            floor: Self.glyphContrastFloor, against: fill, toward: foreground
+        )
+        text = Self.ensuring(
+            background.mixed(toward: foreground, by: Self.textMix),
+            floor: Self.textContrastFloor, against: background, toward: foreground
+        )
+    }
+
+    /// `color`, or the smallest move from it toward black or white that
+    /// reaches `floor` against `reference`. It prefers the pole on
+    /// `direction`'s side of the reference, and takes the other pole when
+    /// that one cannot reach the floor. A floor of 4.58 or less is always
+    /// reachable against an opaque color.
+    static func ensuring(_ color: RGB, floor: Double, against reference: RGB, toward direction: RGB) -> RGB {
+        let target = floor + floorMargin
+        if contrastRatio(color, reference) >= target { return color }
+        let white = RGB(red: 1, green: 1, blue: 1)
+        let black = RGB(red: 0, green: 0, blue: 0)
+        let preferred = direction.relativeLuminance >= reference.relativeLuminance ? white : black
+        let other = preferred == white ? black : white
+        let pole = contrastRatio(preferred, reference) >= target ? preferred : other
+        var step = 1
+        while step <= 100 {
+            let candidate = color.mixed(toward: pole, by: Double(step) / 100)
+            if contrastRatio(candidate, reference) >= target { return candidate }
+            step += 1
+        }
+        return pole
+    }
+
+    public enum Role: Sendable, CaseIterable {
+        case fill, glyph, text, line, hatch
+    }
+
+    public func rgb(_ role: Role) -> RGB {
+        switch role {
+        case .fill: fill
+        case .glyph: glyph
+        case .text: text
+        case .line: line
+        case .hatch: hatch
+        }
+    }
+
+    /// The palette for `background` and `foreground` resolved in the current
+    /// drawing appearance. Translucent colors composite over `base`, and the
+    /// foreground over the composited background.
+    public init(background: NSColor, foreground: NSColor, base: NSColor = .windowBackgroundColor) {
+        let surface = Self.rgb(background, over: base)
+        let surfaceColor = NSColor(srgbRed: surface.red, green: surface.green, blue: surface.blue, alpha: 1)
+        self.init(background: surface, foreground: Self.rgb(foreground, over: surfaceColor))
+    }
+
+    /// A dynamic color for `role` that re-derives the palette from
+    /// `background` and `foreground` in whichever appearance draws it, so
+    /// system colors (window background, label) resolve correctly.
+    public static func dynamicColor(
+        _ role: Role,
+        background: NSColor,
+        foreground: NSColor,
+        base: NSColor = .windowBackgroundColor
+    ) -> NSColor {
+        NSColor(name: nil) { appearance in
+            var rgb = RGB(red: 0.5, green: 0.5, blue: 0.5)
+            appearance.performAsCurrentDrawingAppearance {
+                rgb = BonsplitContrastPalette(background: background, foreground: foreground, base: base).rgb(role)
+            }
+            return NSColor(srgbRed: rgb.red, green: rgb.green, blue: rgb.blue, alpha: 1)
+        }
     }
 
     /// `color` as opaque sRGB in the current drawing appearance, composited

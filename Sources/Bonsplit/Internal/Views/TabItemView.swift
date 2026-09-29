@@ -411,13 +411,7 @@ struct TabItemView: View {
     private func presenceAccessory(_ presence: TabPresence) -> some View {
         TabPresenceAccessoryView(
             presence: presence,
-            borderColor: isSelected
-                ? TabBarColors.activeTabBackground(for: appearance)
-                : TabBarColors.barBackground(for: appearance),
-            textColor: isSelected
-                ? TabBarColors.activeText(for: appearance)
-                : TabBarColors.inactiveText(for: appearance),
-            separatorColor: TabBarColors.separator(for: appearance),
+            colors: TabBarColors.presenceColors(for: appearance, isSelected: isSelected),
             isHovered: isPresenceHovered,
             hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
         )

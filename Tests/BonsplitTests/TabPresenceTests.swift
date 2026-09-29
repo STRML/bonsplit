@@ -134,15 +134,4 @@ final class TabPresenceTests: XCTestCase {
         XCTAssertNil(decoded.symbolName)
         XCTAssertTrue(decoded.isOwner)
     }
-
-    func testSeparatorColorIsTheDividerAndTabBarSeparatorColor() {
-        let appearance = BonsplitConfiguration.Appearance(
-            chromeColors: .init(backgroundHex: "#1E1E1E", borderHex: "#FF000080")
-        )
-        let color = appearance.separatorColor.usingColorSpace(.sRGB)!
-        XCTAssertEqual(color.redComponent, 1, accuracy: 0.01)
-        XCTAssertEqual(color.greenComponent, 0, accuracy: 0.01)
-        XCTAssertEqual(color.alphaComponent, 128.0 / 255.0, accuracy: 0.01)
-        XCTAssertEqual(appearance.separatorColor, TabBarColors.nsColorSeparator(for: appearance))
-    }
 }

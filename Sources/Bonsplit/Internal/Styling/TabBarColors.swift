@@ -273,18 +273,41 @@ enum TabBarColors {
         let line: NSColor
     }
 
+    /// The accessory draws on the tab's own fill when selected (unless the
+    /// host shares one backdrop), else on the bar, in the tab bar's text
+    /// color. Every color is dynamic, so system fallbacks resolve in the
+    /// appearance that draws them.
     static func presenceColors(
         for appearance: BonsplitConfiguration.Appearance,
         isSelected: Bool
     ) -> PresenceColors {
-        let separator = nsColorSeparator(for: appearance)
+        let surface = nsColorPresenceSurface(for: appearance, isSelected: isSelected)
+        let foreground = nsColorActiveText(for: appearance)
+        func color(_ role: BonsplitContrastPalette.Role) -> NSColor {
+            BonsplitContrastPalette.dynamicColor(role, background: surface, foreground: foreground)
+        }
         return PresenceColors(
-            surface: nsColorBarBackground(for: appearance),
-            fill: separator.withAlphaComponent(separator.alphaComponent * 0.6),
-            glyph: .secondaryLabelColor,
-            text: effectiveTextColor(for: appearance, secondary: true),
-            line: separator
+            surface: surface,
+            fill: color(.fill),
+            glyph: color(.glyph),
+            text: color(.text),
+            line: color(.line)
         )
+    }
+
+    private static func nsColorPresenceSurface(
+        for appearance: BonsplitConfiguration.Appearance,
+        isSelected: Bool
+    ) -> NSColor {
+        guard isSelected, !appearance.usesSharedBackdrop else {
+            return nsColorBarBackground(for: appearance)
+        }
+        guard let custom = tabBarBackgroundColor(for: appearance) else {
+            return .controlBackgroundColor
+        }
+        return custom.isBonsplitLightColor
+            ? custom.bonsplitDarken(by: 0.065)
+            : custom.bonsplitLighten(by: 0.12)
     }
 
     static var dropIndicator: Color {
