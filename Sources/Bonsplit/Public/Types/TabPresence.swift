@@ -6,14 +6,15 @@ import Foundation
 /// participants as an avatar accessory after the tab title and adds the
 /// terminal-size section to the tab context menu. A `nil` presence hides both.
 public struct TabPresence: Hashable, Sendable, Codable {
-    /// One attached person or device shown in the tab's avatar stack.
+    /// One other person, or one of the viewer's own other devices, shown in
+    /// the tab's avatar stack. Avatars are neutral grey; the owner gets a ring.
     public struct Participant: Hashable, Sendable, Codable, Identifiable {
-        /// Host-scoped participant id.
+        /// Host-scoped id of the person or device group.
         public var id: String
-        /// One or two letters drawn inside the avatar.
+        /// One or two letters drawn inside the avatar when `symbolName` is nil.
         public var initials: String
-        /// Avatar fill color as `#RRGGBB`.
-        public var colorHex: String
+        /// SF Symbol drawn instead of initials, e.g. `iphone` for the viewer's own phone.
+        public var symbolName: String?
         /// Whether this participant sets the terminal size (drawn with a ring).
         public var isOwner: Bool
         /// Name read by VoiceOver and shown in help text.
@@ -22,15 +23,15 @@ public struct TabPresence: Hashable, Sendable, Codable {
         /// Creates a participant row.
         ///
         /// - Parameters:
-        ///   - id: Host-scoped participant id.
+        ///   - id: Host-scoped id.
         ///   - initials: Letters drawn inside the avatar.
-        ///   - colorHex: Avatar color as `#RRGGBB`.
+        ///   - symbolName: SF Symbol drawn instead of the initials, if any.
         ///   - isOwner: Whether this participant sets the terminal size.
         ///   - accessibilityName: Spoken name.
-        public init(id: String, initials: String, colorHex: String, isOwner: Bool, accessibilityName: String) {
+        public init(id: String, initials: String, symbolName: String? = nil, isOwner: Bool, accessibilityName: String) {
             self.id = id
             self.initials = initials
-            self.colorHex = colorHex
+            self.symbolName = symbolName
             self.isOwner = isOwner
             self.accessibilityName = accessibilityName
         }
@@ -50,7 +51,7 @@ public struct TabPresence: Hashable, Sendable, Codable {
         case fixed
     }
 
-    /// Attached participants, owner first. Empty hides the tab accessory
+    /// Other attached people and devices (never the viewer), owner first. Empty hides the tab accessory
     /// while keeping the terminal-size context menu section.
     public var participants: [Participant]
     /// The current sizing mode, checked in the context menu.
@@ -66,7 +67,7 @@ public struct TabPresence: Hashable, Sendable, Codable {
     /// Creates a presence snapshot.
     ///
     /// - Parameters:
-    ///   - participants: Attached participants, owner first; empty hides the accessory.
+    ///   - participants: Other people and devices, owner first; empty hides the accessory.
     ///   - sizeMode: Current sizing mode.
     ///   - canDisconnectOthers: Whether other clients can be disconnected.
     ///   - accessibilityLabel: Accessory label and tooltip.

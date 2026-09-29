@@ -7,8 +7,8 @@ final class TabPresenceTests: XCTestCase {
     private func samplePresence(mode: TabPresence.SizeMode = .priority, canDisconnect: Bool = false, alone: Bool = false) -> TabPresence {
         TabPresence(
             participants: alone ? [] : [
-                .init(id: "c3", initials: "MO", colorHex: "#3CC2B0", isOwner: true, accessibilityName: "Maya Ortiz"),
-                .init(id: "mobile:1", initials: "DV", colorHex: "#EBA946", isOwner: false, accessibilityName: "Dev"),
+                .init(id: "user:u_maya", initials: "MO", isOwner: true, accessibilityName: "Maya Ortiz"),
+                .init(id: "device:iphone", initials: "", symbolName: "iphone", isOwner: false, accessibilityName: "iPhone"),
             ],
             sizeMode: mode,
             canDisconnectOthers: canDisconnect,
@@ -127,10 +127,11 @@ final class TabPresenceTests: XCTestCase {
         XCTAssertNil(controller.popoverAnchorView(for: tabId))
     }
 
-    func testHexColorParsing() {
-        XCTAssertNotNil(Color(tabPresenceHex: "#3CC2B0"))
-        XCTAssertNotNil(Color(tabPresenceHex: "D6C24A"))
-        XCTAssertNil(Color(tabPresenceHex: "#12345"))
-        XCTAssertNil(Color(tabPresenceHex: "zzzzzz"))
+    func testParticipantDecodesPayloadWithoutSymbolName() throws {
+        let json = ##"{"id":"c3","initials":"MO","colorHex":"#3CC2B0","isOwner":true,"accessibilityName":"Maya"}"##
+        let decoded = try JSONDecoder().decode(TabPresence.Participant.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.initials, "MO")
+        XCTAssertNil(decoded.symbolName)
+        XCTAssertTrue(decoded.isOwner)
     }
 }
