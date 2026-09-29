@@ -417,6 +417,7 @@ struct TabItemView: View {
             textColor: isSelected
                 ? TabBarColors.activeText(for: appearance)
                 : TabBarColors.inactiveText(for: appearance),
+            separatorColor: TabBarColors.separator(for: appearance),
             isHovered: isPresenceHovered,
             hoverBackground: TabBarColors.hoveredTabBackground(for: appearance)
         )

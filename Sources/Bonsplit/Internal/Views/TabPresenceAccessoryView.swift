@@ -1,14 +1,18 @@
 import SwiftUI
 
 /// The shared-terminal presence accessory drawn after a tab title: up to
-/// three overlapping neutral grey avatars (initials for other people, a device
-/// glyph for the viewer's own other devices), a thin neutral ring on the owner,
-/// and `+N` for the rest. No per-participant colors.
+/// three overlapping avatars (initials for other people, a device glyph for
+/// the viewer's own other devices), a thin ring on the owner, and `+N` for the
+/// rest. Avatars and the ring use the appearance's separator grey (the split
+/// divider and tab-bar separator color). No per-participant colors.
 struct TabPresenceAccessoryView: View {
     let presence: TabPresence
     /// Fill behind the tab, used for the avatar separation border.
     let borderColor: Color
     let textColor: Color
+    /// The split divider / tab-bar separator grey; the owner ring draws in it
+    /// and avatar fills derive from it.
+    let separatorColor: Color
     let isHovered: Bool
     let hoverBackground: Color
 
@@ -16,6 +20,7 @@ struct TabPresenceAccessoryView: View {
     private static let avatarSize: CGFloat = 14
     private static let overlap: CGFloat = 4
     private static let ringWidth: CGFloat = 1
+    private static let avatarFillOpacity: Double = 0.6
 
     var body: some View {
         let shown = Array(presence.participants.prefix(Self.maxAvatars))
@@ -47,7 +52,7 @@ struct TabPresenceAccessoryView: View {
         ZStack {
             // Opaque base so overlapping avatars do not show through each other.
             Circle().fill(borderColor)
-            Circle().fill(Color(nsColor: .quaternaryLabelColor))
+            Circle().fill(separatorColor.opacity(Self.avatarFillOpacity))
             if let symbolName = participant.symbolName {
                 Image(systemName: symbolName)
                     .font(.system(size: 7, weight: .medium))
@@ -66,7 +71,7 @@ struct TabPresenceAccessoryView: View {
             if participant.isOwner {
                 Circle()
                     .inset(by: -(Self.ringWidth + 0.5))
-                    .stroke(Color(nsColor: .labelColor).opacity(0.5), lineWidth: Self.ringWidth)
+                    .stroke(separatorColor, lineWidth: Self.ringWidth)
             }
         }
         .padding(participant.isOwner ? Self.ringWidth + 0.5 : 0)
