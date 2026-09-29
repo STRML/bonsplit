@@ -108,8 +108,8 @@ enum TabControlShortcutHintStyle {
     static let nsFontWeight: NSFont.Weight = .semibold
     static let fontDesign: Font.Design = .rounded
     /// Opaque palette shared with the host's shortcut-hint pills so every
-    /// Cmd-hold hint reads the same in both schemes: about 11:1 on dark
-    /// chrome and 12:1 on light chrome, independent of what is behind it.
+    /// Cmd-hold hint reads the same in both schemes: 10.4:1 on dark
+    /// chrome and 15.1:1 on light chrome, independent of what is behind it.
     static func foregroundColor(isDark: Bool) -> Color {
         isDark ? Color.white.opacity(0.95) : Color.black.opacity(0.85)
     }
