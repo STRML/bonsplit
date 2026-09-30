@@ -1293,6 +1293,32 @@ final class BonsplitTests: XCTestCase {
         XCTAssertEqual(Int(round(alpha * 255)), 255)
     }
 
+    func testChromeDividerHexColorsOnlyTheSplitDivider() {
+        let appearance = BonsplitConfiguration.Appearance(
+            chromeColors: .init(backgroundHex: "#272822", borderHex: "#112233", dividerHex: "#4A4C47")
+        )
+        let divider = TabBarColors.nsColorSplitDivider(for: appearance).usingColorSpace(.sRGB)!
+        let separator = TabBarColors.nsColorSeparator(for: appearance).usingColorSpace(.sRGB)!
+
+        XCTAssertEqual(Int(round(divider.redComponent * 255)), 0x4A)
+        XCTAssertEqual(Int(round(divider.greenComponent * 255)), 0x4C)
+        XCTAssertEqual(Int(round(divider.blueComponent * 255)), 0x47)
+        XCTAssertEqual(Int(round(separator.redComponent * 255)), 0x11)
+        XCTAssertEqual(Int(round(separator.greenComponent * 255)), 0x22)
+        XCTAssertEqual(Int(round(separator.blueComponent * 255)), 0x33)
+    }
+
+    func testSplitDividerFallsBackToSeparatorWithoutDividerHex() {
+        let appearance = BonsplitConfiguration.Appearance(
+            chromeColors: .init(backgroundHex: "#272822", borderHex: "#112233")
+        )
+
+        XCTAssertEqual(
+            TabBarColors.nsColorSplitDivider(for: appearance),
+            TabBarColors.nsColorSeparator(for: appearance)
+        )
+    }
+
     func testInvalidChromeBackgroundHexFallsBackToPaneDefaultColor() {
         let appearance = BonsplitConfiguration.Appearance(
             chromeColors: .init(backgroundHex: "#ZZZZZZ")

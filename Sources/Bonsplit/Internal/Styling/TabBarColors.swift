@@ -310,6 +310,15 @@ enum TabBarColors {
             : custom.bonsplitLighten(by: 0.12)
     }
 
+    /// The divider between split panes: `dividerHex` when set, otherwise the chrome separator.
+    static func nsColorSplitDivider(for appearance: BonsplitConfiguration.Appearance) -> NSColor {
+        if let value = appearance.chromeColors.dividerHex,
+           let divider = NSColor(bonsplitHex: value) {
+            return divider
+        }
+        return nsColorSeparator(for: appearance)
+    }
+
     static var dropIndicator: Color {
         Color.accentColor
     }
