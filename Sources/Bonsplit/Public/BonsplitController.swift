@@ -930,10 +930,10 @@ public final class BonsplitController {
     /// Get the tab IDs in a specific pane, in tab order.
     ///
     /// Prefer this over `tabs(inPane:)` when only identity or ordering is
-    /// wanted. `Tab.init(from:)` copies all fourteen `TabItem` properties, so
-    /// a caller that asks for tabs to read their ids pays for thirteen fields
-    /// it discards, per tab, on every call. This reads the id and nothing
-    /// else.
+    /// wanted. This maps each `TabItem` directly to a `TabID` without building
+    /// a `Tab` snapshot and copying its metadata. Together with `TabItem`'s
+    /// per-tab observation, this avoids title-driven invalidation for callers
+    /// that only read IDs; this method alone does not change observation.
     public func tabIds(inPane paneId: PaneID) -> [TabID] {
         guard let pane = internalController.paneState(for: paneId) else {
             return []
