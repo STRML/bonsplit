@@ -327,6 +327,7 @@ public final class BonsplitController {
     ///   - isAudioMuted: New browser-audio mute state (pass nil to keep current)
     ///   - isAudioPlaying: New audible-audio state (pass nil to keep current)
     ///   - isPinned: New pinned state (pass nil to keep current)
+    ///   - presence: New shared-terminal presence (pass nil to keep current, pass .some(nil) to remove)
     public func updateTab(
         _ tabId: TabID,
         title: String? = nil,
@@ -341,7 +342,8 @@ public final class BonsplitController {
         isAudioMuted: Bool? = nil,
         isAudioPlaying: Bool? = nil,
         isPinned: Bool? = nil,
-        showsRemoteIndicator: Bool? = nil
+        showsRemoteIndicator: Bool? = nil,
+        presence: TabPresence?? = nil
     ) {
         guard let (pane, tabIndex) = findTabInternal(tabId) else { return }
         let currentTab = pane.tabs[tabIndex]
@@ -358,7 +360,8 @@ public final class BonsplitController {
             isAudioMuted.map { currentTab.isAudioMuted != $0 } ?? false ||
             isAudioPlaying.map { currentTab.isAudioPlaying != $0 } ?? false ||
             isPinned.map { currentTab.isPinned != $0 } ?? false ||
-            showsRemoteIndicator.map { currentTab.showsRemoteIndicator != $0 } ?? false
+            showsRemoteIndicator.map { currentTab.showsRemoteIndicator != $0 } ?? false ||
+            presence.map { currentTab.presence != $0 } ?? false
         guard didChange else { return }
 
         if let title = title {
@@ -399,6 +402,9 @@ public final class BonsplitController {
         }
         if let showsRemoteIndicator = showsRemoteIndicator {
             currentTab.showsRemoteIndicator = showsRemoteIndicator
+        }
+        if let presence = presence {
+            pane.tabs[tabIndex].presence = presence
         }
     }
 
@@ -533,6 +539,61 @@ public final class BonsplitController {
 
     // MARK: - Split Operations
 
+    /// Splits the workspace root, keeping the existing pane tree intact.
+    ///
+    /// The new pane becomes a sibling of the complete existing tree, so a
+    /// horizontal split always creates a full-height column and a vertical
+    /// split always creates a full-width row regardless of the focused pane.
+    ///
+    /// - Parameters:
+    ///   - orientation: Direction to split (horizontal = side-by-side, vertical = stacked).
+    ///   - tab: Tab to add to the new root pane.
+    ///   - insertFirst: Whether to place the new pane before the existing tree.
+    ///   - initialDividerPosition: Optional normalized divider position.
+    /// - Returns: The new pane ID, or nil if the delegate vetoes the split.
+    @discardableResult
+    public func splitRoot(
+        orientation: SplitOrientation,
+        withTab tab: Tab,
+        insertFirst: Bool = false,
+        initialDividerPosition: CGFloat? = nil
+    ) -> PaneID? {
+        guard configuration.allowSplits,
+              let originalPaneId = internalController.rootNode.allPaneIds.first else {
+            return nil
+        }
+        if delegate?.splitTabBar(self, shouldSplitPane: originalPaneId, orientation: orientation) == false {
+            return nil
+        }
+
+        let internalTab = TabItem(
+            id: tab.id.id,
+            title: tab.title,
+            hasCustomTitle: tab.hasCustomTitle,
+            icon: tab.icon,
+            iconImageData: tab.iconImageData,
+            iconAsset: tab.iconAsset,
+            kind: tab.kind,
+            isDirty: tab.isDirty,
+            showsNotificationBadge: tab.showsNotificationBadge,
+            isLoading: tab.isLoading,
+            isAudioMuted: tab.isAudioMuted,
+            isAudioPlaying: tab.isAudioPlaying,
+            isPinned: tab.isPinned,
+            showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
+        )
+        let newPaneId = internalController.splitRootWithTab(
+            orientation: orientation,
+            tab: internalTab,
+            insertFirst: insertFirst,
+            initialDividerPosition: initialDividerPosition
+        )
+        delegate?.splitTabBar(self, didSplitPane: originalPaneId, newPane: newPaneId, orientation: orientation)
+        notifyGeometryChange()
+        return newPaneId
+    }
+
     /// Split the focused pane (or specified pane)
     /// - Parameters:
     ///   - paneId: Optional pane to split (defaults to focused pane)
@@ -572,7 +633,8 @@ public final class BonsplitController {
                 isAudioMuted: tab.isAudioMuted,
                 isAudioPlaying: tab.isAudioPlaying,
                 isPinned: tab.isPinned,
-                showsRemoteIndicator: tab.showsRemoteIndicator
+                showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
             )
         } else {
             internalTab = nil
@@ -641,7 +703,8 @@ public final class BonsplitController {
             isAudioMuted: tab.isAudioMuted,
             isAudioPlaying: tab.isAudioPlaying,
             isPinned: tab.isPinned,
-            showsRemoteIndicator: tab.showsRemoteIndicator
+            showsRemoteIndicator: tab.showsRemoteIndicator,
+            presence: tab.presence
         )
 
         // Perform split with insertion side.
@@ -658,6 +721,55 @@ public final class BonsplitController {
 
         // Notify delegate
         delegate?.splitTabBar(self, didSplitPane: targetPaneId, newPane: newPaneId, orientation: orientation)
+
+        notifyGeometryChange()
+
+        return newPaneId
+    }
+
+    /// Add a pane holding `tab` and arrange all panes in Zellij's default
+    /// tiled layout (cmux-tui's Alt-n "new pane"). Panes fill a right-hand
+    /// column of up to four before a new column opens, and every column and
+    /// row gets an equal share. Existing panes keep their tabs and identity.
+    ///
+    /// - Parameters:
+    ///   - paneId: The pane the request comes from (defaults to the focused
+    ///     pane). The delegate sees it as the split source.
+    ///   - tab: The tab to place in the new pane.
+    /// - Returns: The new pane ID, or nil if splits are disabled or vetoed.
+    @discardableResult
+    public func addPaneWithAutoLayout(from paneId: PaneID? = nil, withTab tab: Tab) -> PaneID? {
+        guard configuration.allowSplits else { return nil }
+        guard let sourcePaneId = paneId ?? focusedPaneId,
+              internalController.paneState(for: sourcePaneId) != nil else { return nil }
+
+        let columnSizes = SplitViewController.autoLayoutColumnSizes(
+            paneCount: internalController.paneCount + 1
+        )
+        let orientation: SplitOrientation = columnSizes.last == 1 ? .horizontal : .vertical
+        if delegate?.splitTabBar(self, shouldSplitPane: sourcePaneId, orientation: orientation) == false {
+            return nil
+        }
+
+        let internalTab = TabItem(
+            id: tab.id.id,
+            title: tab.title,
+            hasCustomTitle: tab.hasCustomTitle,
+            icon: tab.icon,
+            iconImageData: tab.iconImageData,
+            iconAsset: tab.iconAsset,
+            kind: tab.kind,
+            isDirty: tab.isDirty,
+            showsNotificationBadge: tab.showsNotificationBadge,
+            isLoading: tab.isLoading,
+            isAudioMuted: tab.isAudioMuted,
+            isAudioPlaying: tab.isAudioPlaying,
+            isPinned: tab.isPinned,
+            showsRemoteIndicator: tab.showsRemoteIndicator
+        )
+        let newPaneId = internalController.insertPaneWithAutoLayout(tab: internalTab)
+
+        delegate?.splitTabBar(self, didSplitPane: sourcePaneId, newPane: newPaneId, orientation: orientation)
 
         notifyGeometryChange()
 
@@ -796,7 +908,9 @@ public final class BonsplitController {
         }
     }
 
-    /// Find the closest pane in the requested direction from the given pane.
+    /// The pane directional navigation from `paneId` reaches: the most
+    /// recently focused pane sharing that edge, else the one most directly
+    /// across. Nil at the outer edge.
     public func adjacentPane(to paneId: PaneID, direction: NavigationDirection) -> PaneID? {
         internalController.adjacentPane(to: paneId, direction: direction)
     }
