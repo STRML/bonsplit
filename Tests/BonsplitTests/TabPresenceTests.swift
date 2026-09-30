@@ -16,6 +16,32 @@ final class TabPresenceTests: XCTestCase {
         )
     }
 
+    /// Overlapping avatars clipped the first letter of every later one
+    /// ("MC" read ".C"). Three avatars must sit side by side, so the accessory
+    /// is at least three avatars plus its padding wide.
+    @MainActor
+    func testAccessoryAvatarsDoNotOverlap() {
+        let presence = TabPresence(
+            participants: [
+                .init(id: "user:u_li", initials: "LC", isOwner: false, accessibilityName: "Li"),
+                .init(id: "user:u_mc", initials: "MC", isOwner: false, accessibilityName: "Mo"),
+                .init(id: "user:u_ww", initials: "WW", isOwner: false, accessibilityName: "Wu"),
+            ],
+            sizeMode: .smallest,
+            canDisconnectOthers: false,
+            accessibilityLabel: "Size"
+        )
+        let appearance = BonsplitConfiguration.Appearance(chromeColors: .init(backgroundHex: "#ffffff"))
+        let host = NSHostingView(rootView: TabPresenceAccessoryView(
+            presence: presence,
+            colors: TabBarColors.presenceColors(for: appearance, isSelected: true),
+            isHovered: false,
+            hoverBackground: .clear
+        ))
+        let avatars = CGFloat(TabPresenceAccessoryView.maxAvatars) * TabPresenceAccessoryView.avatarSize
+        XCTAssertGreaterThanOrEqual(host.fittingSize.width, avatars + 2 * TabPresenceAccessoryView.horizontalPadding)
+    }
+
     func testAccessoryShowsOnlyWithParticipants() {
         XCTAssertTrue(samplePresence().showsAccessory)
         XCTAssertFalse(samplePresence(alone: true).showsAccessory)

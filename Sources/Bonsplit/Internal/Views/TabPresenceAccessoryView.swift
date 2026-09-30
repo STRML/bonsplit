@@ -13,7 +13,8 @@ struct TabPresenceAccessoryView: View {
     let hoverBackground: Color
 
     static let maxAvatars = 3
-    private static let avatarSize: CGFloat = 14
+    static let avatarSize: CGFloat = 14
+    static let horizontalPadding: CGFloat = 3
     private static let overlap: CGFloat = 4
     private static let ringWidth: CGFloat = 1
 
@@ -34,7 +35,7 @@ struct TabPresenceAccessoryView: View {
                     .fixedSize()
             }
         }
-        .padding(.horizontal, 3)
+        .padding(.horizontal, Self.horizontalPadding)
         .padding(.vertical, 1)
         .background(
             Capsule(style: .continuous)
