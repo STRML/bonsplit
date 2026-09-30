@@ -106,6 +106,13 @@ enum TabBarColors {
         return NSColor.white.withAlphaComponent(alpha)
     }
 
+    /// Whether chrome drawn over the tab bar should use its dark palette:
+    /// the same WCAG choice as the tab text, or `nil` without a custom
+    /// background, where the view's color scheme decides.
+    static func usesDarkChrome(for appearance: BonsplitConfiguration.Appearance) -> Bool? {
+        semanticTabBarBackgroundColor(for: appearance).map { !$0.isBonsplitLightColor }
+    }
+
     static func paneBackground(for appearance: BonsplitConfiguration.Appearance) -> Color {
         Color(nsColor: paneBackgroundColor(for: appearance) ?? .textBackgroundColor)
     }
@@ -394,6 +401,12 @@ private extension NSColor {
         self.init(red: red, green: green, blue: blue, alpha: alpha)
     }
 
+    /// Whether dark text reads better than light text on this color.
+    ///
+    /// Compares WCAG contrast of black and white against the color's relative
+    /// luminance, the same choice the host app makes for its sidebar. A plain
+    /// gamma-space brightness cutoff called saturated mid-tones such as
+    /// `#E44330` dark and drew white text at 3.2:1 where black reads at 5.4:1.
     var isBonsplitLightColor: Bool {
         var red: CGFloat = 0
         var green: CGFloat = 0
@@ -401,8 +414,15 @@ private extension NSColor {
         var alpha: CGFloat = 0
         let color = usingColorSpace(.sRGB) ?? self
         color.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
-        let luminance = (0.299 * red) + (0.587 * green) + (0.114 * blue)
-        return luminance > 0.5
+        func linearized(_ component: CGFloat) -> CGFloat {
+            component <= 0.03928
+                ? component / 12.92
+                : CGFloat(pow(Double((component + 0.055) / 1.055), 2.4))
+        }
+        let luminance = 0.2126 * linearized(red) + 0.7152 * linearized(green) + 0.0722 * linearized(blue)
+        let blackContrast = (luminance + 0.05) / 0.05
+        let whiteContrast = 1.05 / (luminance + 0.05)
+        return blackContrast > whiteContrast
     }
 
     func bonsplitSaturating(by amount: Double) -> NSColor {
