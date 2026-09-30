@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// The shared-terminal presence accessory drawn after a tab title: up to
-/// three overlapping avatars (initials for other people, a device glyph for
+/// three avatars side by side (initials for other people, a device glyph for
 /// the viewer's own other devices), a thin ring on the owner, and `+N` for the
 /// rest. Neutral colors derived from the tab surface and the tab bar's text
 /// color (``TabBarColors/presenceColors(for:isSelected:)``), with 4.5:1
@@ -15,23 +15,23 @@ struct TabPresenceAccessoryView: View {
     static let maxAvatars = 3
     static let avatarSize: CGFloat = 14
     static let horizontalPadding: CGFloat = 3
-    private static let overlap: CGFloat = 4
+    /// Gap between avatars. Two 7 pt initials are about 10.5 pt wide in a
+    /// 14 pt circle, so any overlap clips the next avatar's first letter.
+    private static let avatarSpacing: CGFloat = 2
     private static let ringWidth: CGFloat = 1
 
     var body: some View {
         let shown = Array(presence.participants.prefix(Self.maxAvatars))
         let extra = presence.participants.count - shown.count
-        HStack(spacing: -Self.overlap) {
-            // Later avatars sit under earlier ones so the owner (first) stays on top.
-            ForEach(Array(shown.enumerated()), id: \.element.id) { index, participant in
+        HStack(spacing: Self.avatarSpacing) {
+            ForEach(shown) { participant in
                 avatar(participant)
-                    .zIndex(Double(shown.count - index))
             }
             if extra > 0 {
                 Text(verbatim: "+\(extra)")
                     .font(.system(size: 9, weight: .semibold).monospacedDigit())
                     .foregroundStyle(Color(nsColor: colors.text))
-                    .padding(.leading, Self.overlap + 3)
+                    .padding(.leading, 1)
                     .fixedSize()
             }
         }
@@ -46,7 +46,6 @@ struct TabPresenceAccessoryView: View {
 
     private func avatar(_ participant: TabPresence.Participant) -> some View {
         ZStack {
-            // Opaque, so overlapping avatars do not show through each other.
             Circle().fill(Color(nsColor: colors.fill))
             if let symbolName = participant.symbolName {
                 Image(systemName: symbolName)
